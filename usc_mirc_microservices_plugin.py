@@ -11,15 +11,19 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
         super(IslandoraListenerPlugin, self).initialize(config_parser)
 
         try:
-          self.islandora_url = config_parser.get('Islandora', 'url')
-          self.islandora_create_access_endpoint = self.islandora_url + '/' + config_parser.get('Islandora', 'create_access_endpoint')
-          self.islandora_username = config_parser.get('Islandora', 'username')
-          self.islandora_password = config_parser.get('Islandora', 'password')
-          self.stream_url_base = config_parser.get('Custom', 'streaming_url_base')
-          self.stream_output_path = config_parser.get('Custom', 'output_path')
-          bug_name = config_parser.get('Custom', 'bug_name')
+          self.islandora_url = config_parser.get('MIRC', 'url')
+          self.islandora_create_access_endpoint = self.islandora_url + '/' + config_parser.get('MIRC', 'create_access_endpoint')
+          self.islandora_username = config_parser.get('MIRC', 'username')
+          self.islandora_password = config_parser.get('MIRC', 'password')
+          self.stream_output_path = config_parser.get('MIRC', 'output_path')
+          if not os.path.isdir(self.stream_output_path):
+              self.logger.error('Transcode output path does not exist, or is not a directory!')
+              return False
+          bug_name = config_parser.get('MIRC', 'bug_name')
           self.bug_path = os.path.realpath(bug_name)
-          self.mezzanine_content_model
+          if not os.path.isfile(self.bug_path):
+              self.logger.error('File at bug path does not exist!')
+              return False
         except ConfigParser.Error:
           self.logger.exception('Failed to read values from config.')
           return False
