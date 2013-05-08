@@ -55,10 +55,12 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
 
                r = self.requests_session.post(self.islandora_create_access_endpoint, data=data)
 
-           if r.code == requests.codes.ok:
-               self.logger.info('Informed Islandora about new access variant.')
+           os.remove(data['thumbnail_path'])
+
+           if r.code == requests.codes.created:
+               self.logger.info('Islandora created new access variant.')
            else:
-               self.logger.warning('Error informing Islandora about the new access variant.')
+               self.logger.warning('Islandora failed to create the new access variant.')
     '''
     Create an access copy with FFMpeg, and return the path to where it is.
 
