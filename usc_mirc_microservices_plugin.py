@@ -8,7 +8,7 @@ import requests
 
 class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
     def initialize(self, config_parser):
-        super(IslandoraListenerPlugin, self).initialize(config_parser)
+        IslandoraListenerPlugin.initialize(self, config_parser)
 
         try:
           self.islandora_url = config_parser.get('MIRC', 'url')
@@ -20,7 +20,7 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
               self.logger.error('Transcode output path does not exist, or is not a directory!')
               return False
           bug_name = config_parser.get('MIRC', 'bug_name')
-          self.bug_path = os.path.realpath(bug_name)
+          self.bug_path = os.path.realpath(os.path.join(os.path.dirname(__file__), bug_name))
           if not os.path.isfile(self.bug_path):
               self.logger.error('File at bug path does not exist!')
               return False
@@ -33,13 +33,20 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
         return True
 
     def fedoraMessage(self, message, obj, client):
-        if 'usc:mezzanineCModel' in message['content_models'] and message['method'] == 'ingest' and 'PBCORE' in object:
+        if 'usc:mezzanineCModel' in message['content_models'] and message['method'] == 'ingest' and 'PBCORE' in obj:
            data = {
-             'parent': object.pid
+             'parent': obj.pid
            }
            # Get the mezz path from the PBCore.
            # /pb:pbcoreInstantiationDocument/pb:instantiationIdentifier[@source="filename"]
-           path = 'asdf'
+           pbcore = etree.fromstring(obj['PBCORE'].getContent().read())
+           path = pbcore.xpath('/pb:pbcoreInstantiationDocument/pb:instantiationIdentifier[@source="filename"]', namespaces={
+             'pb': 'http://www.pbcore.org/PBCore/PBCoreNamespace.html'
+           })
+           if len(path) > 0:
+               path = path[0].text
+           else:
+               self.logger.warning('Missing path in PBCore.')
            # Throw the mezz path at the access copy function, and create a child as an access copy.
            data['video_path'] = self.produceVideoAccessCopy(path)
            # Throw the mezz path at the thumbnail function, and store the thumbnail somewhere.
@@ -75,17 +82,19 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
         basename = os.path.basename(filename)
         base, ext = os.path.splitext(basename)
         output_name = os.path.join(self.stream_output_path, base + '_Acc.m4v')
-        conv = self.f.convert(filename, output_name, [
+        info = self.f.probe(filename)
+        conv = self.f.convert(filename, output_name, opts=[
             '-i', self.bug_path,
-            '-filter_complex' , '[0:v]yadif[0:-1];[0:-1][1:v]overlay[out]',
+            '-filter_complex' , '[0:v]yadif[0:-1];[1:v]scale=width=%s:height=%s[1:-1];[0:-1][1:-1]overlay[out]' % (info.video.width, info.video.height),
             '-map','[out]',
             '-map', '0:a:0',
             '-c:v', 'libx264',
             '-pix_fmt','yuv420p',
             '-x264opts', 'bitrate=800',
             '-s','480x360' ,
-            '-strict','-2','-c:a','aac'
-        ])
+            '-strict','-2','-c:a','aac',
+            '-movflags', 'faststart'
+        ], timeout=False)
 
         for timecode in conv:
             pass
