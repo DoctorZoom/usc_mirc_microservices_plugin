@@ -1,1 +1,14 @@
-Depends on https://github.com/senko/python-video-converter.
+USC MIRC Microservices Plugin
+
+--- Dependencies ---
+
+* Python Video Converter: https://github.com/senko/python-video-converter
+  * ffmpeg
+* requests
+
+--- Installation ---
+
+Put the plugin in a location discoverable by Microservices, and opy the
+usc_mirc_microservices_plugin.cfg.default to usc_mirc_microservices_plugin.cfg,
+and adjust the values in the "MIRC" section as required (likely "url",
+"username" and "password").
