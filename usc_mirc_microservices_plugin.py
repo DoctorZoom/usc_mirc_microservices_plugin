@@ -1,3 +1,4 @@
+
 from plugin_manager import IslandoraListenerPlugin
 import ConfigParser
 
@@ -29,6 +30,7 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
           return False
 
         self.f = FFMpeg()
+        self.requests_session = requests.Session()
 
         return True
 
@@ -51,24 +53,22 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
            data['video_path'] = self.produceVideoAccessCopy(path)
            # Throw the mezz path at the thumbnail function, and store the thumbnail somewhere.
            data['thumbnail_path'] = self.produceThumbnail(path)
-           # Throw the paths to the access copy and thumbnail at Islandora.
-           if not self.requests_session:
-             self.requests_session = requests.Session()
 
+           # Throw the paths to the access copy and thumbnail at Islandora.
            r = self.requests_session.post(self.islandora_create_access_endpoint, data=data)
-           if r.code == requests.codes.unauthorized:
-               # first attempt failed due to missing creds... Let's try to authenticate, and try again.
+           if r.status_code == requests.codes.forbidden:
+               # first attempt might fail due to an expired session... Let's try to authenticate, and try again.
                r = self.requests_session.post(self.islandora_url + '/user/login', data={
-                 'username': self.islandora_username,
-                 'password': self.islandora_password,
-                 'form_id': 'user_login'
+                 'name': self.islandora_username,
+                 'pass': self.islandora_password,
+                 'form_id': 'user_login',
                }, headers={'content-type': 'application/x-www-form-urlencoded'})
 
                r = self.requests_session.post(self.islandora_create_access_endpoint, data=data)
 
            os.remove(data['thumbnail_path'])
 
-           if r.code == requests.codes.created:
+           if r.status_code == requests.codes.created:
                self.logger.info('Islandora created new access variant.')
            else:
                self.logger.warning('Islandora failed to create the new access variant.')
@@ -85,7 +85,7 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
         info = self.f.probe(filename)
         conv = self.f.convert(filename, output_name, opts=[
             '-i', self.bug_path,
-            '-filter_complex' , '[0:v]yadif[0:-1];[1:v]scale=width=%s:height=%s[1:-1];[0:-1][1:-1]overlay[out]' % (info.video.width, info.video.height),
+            '-filter_complex' , '[0:v]yadif[0:-1];[1:v]scale=size=%sx%s[1:-1];[0:-1][1:-1]overlay[out]' % (info.video.video_width, info.video.video_height),
             '-map','[out]',
             '-map', '0:a:0',
             '-c:v', 'libx264',
