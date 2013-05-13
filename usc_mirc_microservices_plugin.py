@@ -1,4 +1,5 @@
 
+from islandoraUtils.fedoraLib import update_datastream
 from plugin_manager import IslandoraListenerPlugin
 import ConfigParser
 
@@ -65,6 +66,8 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
                }, headers={'content-type': 'application/x-www-form-urlencoded'})
 
                r = self.requests_session.post(self.islandora_create_access_endpoint, data=data)
+
+           update_datastream(obj, 'TN', data['thumbnail_path'], label='Thumbnail', mimeType='image/png')
 
            os.remove(data['thumbnail_path'])
 
