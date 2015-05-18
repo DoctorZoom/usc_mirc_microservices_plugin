@@ -86,18 +86,24 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
         base, ext = os.path.splitext(basename)
         output_name = os.path.join(self.stream_output_path, base + '_Acc.m4v')
         info = self.f.probe(filename)
-        conv = self.f.convert(filename, output_name, opts=[
-            '-i', self.bug_path,
-            '-filter_complex' , '[0:v]yadif[0:-1];[1:v]scale=size=%sx%s[1:-1];[0:-1][1:-1]overlay[out]' % (info.video.video_width, info.video.video_height),
-            '-map','[out]',
-            '-map', '0:a:0',
-            '-c:v', 'libx264',
-            '-pix_fmt','yuv420p',
-            '-x264opts', 'bitrate=800',
-            '-s','480x360' ,
-            '-strict','-2','-c:a','aac',
-            '-movflags', 'faststart'
-        ], timeout=False)
+        #   For mezzanines that are not 1920 pixels wide deinterlace if necessary and scale
+        if info.video.video_width != 1920:
+            conv = self.f.convert(filename, output_name, opts=[
+                '-i', self.bug_path,
+                '-filter_complex', 'yadif,scale=-2:360,overlay=10:main_h-overlay_h-10',
+                '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-b:v', '786k',
+                '-c:a', 'libvo_aacenc',
+                '-movflags', 'faststart'
+                ],timeout=False)
+        #  For mezzanines that are 1920 pixels wide, crop to remove pillar box and scale
+        else:
+            conv = self.f.convert(filename, output_name, opts=[
+                '-i', self.bug_path,
+                '-filter_complex', 'crop=1440:in_h:240:0,scale=-2:360,overlay=10:main_h-overlay_h-10',
+                '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-b:v', '786k',
+                '-c:a', 'libvo_aacenc',
+                '-movflags', 'faststart'
+                ], timeout=False)
 
         for timecode in conv:
             pass
@@ -110,11 +116,22 @@ class usc_mirc_microservices_plugin(IslandoraListenerPlugin):
     @return
       A file object
     '''
-    def produceThumbnail(self, filename):
-        basename = os.path.basename(filename)
-        base, ext = os.path.splitext(basename)
-        output_name = os.path.join(self.stream_output_path, base + '_thumbnail.png')
+   def produceThumbnail(self, filename):
+       basename = os.path.basename(filename)
+       base, ext = os.path.splitext(basename)
+       output_name = os.path.join(self.stream_output_path, base + '_thumbnail.png')
+       #    Again test for width
+       if info.video.video_width != 1920:
+            thumb = self.f.convert(filename, output_name, opts=[
+                '-vf', 'yadif,scale=480:360,thumbnail=80','-frames:v', '1'
+            ])
+       else:
+            thumb = self.f.convert(filename, output_name, opts=[
+                '-vf', 'crop=1440:in_h:240:0,scale=480:360,thumbnail=80',
+                '-frames:v', '1'
+            ])
 
-        self.f.thumbnail(filename, 20, output_name, '350x260')
+       for timecode in thumb:
+           pass
 
-        return output_name
+       return output_name
